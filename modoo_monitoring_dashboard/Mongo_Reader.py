@@ -23,7 +23,6 @@ MongoDB数据阅读器和EDA分析模块
 - Gestational Week Analysis: 妊娠周期相关分析
 - Outlier Detection: 异常值检测和可视化
 
-作者: Modoo团队
 最后更新: 2025-08-18
 ==================================================
 """
@@ -2034,4 +2033,5 @@ def show_mongodb_data_page():
                     for feature in selected_features:
                         if feature != 'gestational_age_days':
                             st.write(f"#### {feature}")
+
                             
