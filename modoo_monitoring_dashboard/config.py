@@ -3,7 +3,7 @@ import streamlit as st
 
 # Default MongoDB Configuration
 DEFAULT_MONGO_CONFIG = {
-    "uri":"mongo_url",
+    "uri": "mongodb://root:E3Aroot888@dds-n9e25b39e6dfb0941313-pub.mongodb.rds.aliyuncs.com:3717/admin?replicaSet=mgset-90721735",
     "db_name": "Modoo_data",
     "collection_raw": "recruited_patients_raw_data",
     "collection_features": "recruited_patients_data"
@@ -18,4 +18,3 @@ def load_mongo_config():
 def save_mongo_config(config):
     """保存MongoDB配置到session state"""
     st.session_state.mongo_config = config
-

@@ -1,3 +1,42 @@
+"""
+==================================================
+MongoDB数据处理辅助模块
+==================================================
+
+功能描述：
+- 专门处理MongoDB特殊数据格式的工具函数
+- 提供MongoDB连接和查询的高级封装
+- 特征数据提取和格式化功能
+- 支持复杂嵌套数据结构的解析
+
+核心功能：
+1. extract_mongodb_value() - MongoDB特殊格式数值提取
+2. fetch_features() - 批量特征数据获取
+3. MongoDB连接管理和查询执行
+4. 数据类型转换和标准化
+
+数据处理特色：
+- $numberDouble, $numberInt等MongoDB类型处理
+- 嵌套字典和数组的递归解析
+- 空值和异常数据的安全处理
+- pandas DataFrame的无缝集成
+
+支持的MongoDB数据类型：
+- BSON数值类型 ($numberDouble, $numberInt等)
+- ObjectId和时间戳
+- 嵌套文档和数组
+- 特殊MongoDB操作符
+
+使用场景：
+- 胎心监护MongoDB数据提取
+- 特征工程和数据预处理
+- 大规模数据批量处理
+
+作者: Modoo团队
+最后更新: 2025-08-18
+==================================================
+"""
+
 import streamlit as st
 from pymongo import MongoClient
 import pandas as pd

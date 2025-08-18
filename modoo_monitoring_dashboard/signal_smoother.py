@@ -1,3 +1,34 @@
+"""
+==================================================
+信号平滑处理和去噪模块
+==================================================
+
+功能描述：
+- 提供多种信号处理和去噪算法
+- 支持FHR（胎心率）和UC（子宫收缩）信号处理
+- 集成交互式参数调整界面
+- 包含信号处理性能评估指标
+
+支持的信号处理方法：
+1. Moving Average - 移动平均滤波
+2. Savitzky-Golay Filter - 萨维茨基-戈雷滤波
+3. Median Filter - 中值滤波
+4. Bandpass Filter - 带通滤波
+5. Wavelet Denoising - 小波去噪（需要PyWavelets）
+
+评估指标：
+- SNR (Signal-to-Noise Ratio) - 信噪比
+- RMSE (Root Mean Square Error) - 均方根误差
+- Correlation Coefficient - 相关系数
+
+使用场景：
+- 胎心监护数据预处理
+- 时间序列数据平滑
+
+最后更新: 2025-08-18
+==================================================
+"""
+
 import numpy as np
 import pandas as pd
 from scipy.signal import savgol_filter, medfilt, butter, filtfilt
