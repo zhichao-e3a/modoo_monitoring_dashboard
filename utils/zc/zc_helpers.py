@@ -1,7 +1,33 @@
-from database.DatabaseConnector import DatabaseConnector
+from config.configs import ST_CRED
+
+from database.SQLDBConnector import DatabaseConnector
 
 import json
+import requests
 import pandas as pd
+import streamlit as st
+
+def verify_login(username, password):
+
+    if not username:
+        st.warning("Please enter your username")
+
+    elif not password:
+        st.warning("Please enter your password")
+
+    elif username == ST_CRED["ST_USER"] and password == ST_CRED["ST_PASS"]:
+        st.success("Successfully logged in")
+        st.session_state.logged_in = True
+        st.rerun()
+
+    else:
+        st.warning("Wrong username or password")
+
+def run_pipeline():
+
+    requests.get("http://127.0.0.1:8000/run_pipeline")
+
+
 
 query_template = """
 SELECT
@@ -28,60 +54,6 @@ INNER JOIN
 origin_data_record AS r          -- extant_future_data.origin_data_record
 ON r.user_id = uu.id
 AND uu.mobile IN (
-'17301389209',
-'18337956926',
-'15069301215',
-'18629401601',
-'17709422618',
-'18248211164',
-'13602426524',
-'15202835896',
-'17600526199',
-'18989125035',
-'13286855587',
-'18677933834',
-'18043928892',
-'18851001927',
-'18310057300',
-'18711857821',
-'15288286223',
-'18550807290',
-'15652151599',
-'15261897383',
-'13755619181',
-'15022090627',
-'17898805632',
-'13718500355',
-'13466334784',
-'13531735227',
-'15959171173',
-'18733239144',
-'15088068036',
-'13828353366',
-'18420023897',
-'13765322064',
-'13760308579',
-'17326961963',
-'17392045528',
-'18555218558',
-'15601726670',
-'13164622273',
-'18610926757',
-'15101601909',
-'18205254928',
-'18511762583',
-'18513517631',
-'18606931203',
-'18066288005',
-'18801250804',
-'18516282171',
-'13671697848',
-'13851994410',
-'15629060979',
-'18274898881',
-'13066851756',
-'17573141019',
-'18801901850'
 )
 AND r.start_ts BETWEEN UNIX_TIMESTAMP({start}) AND UNIX_TIMESTAMP({end})
 """

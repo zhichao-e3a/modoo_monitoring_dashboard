@@ -14,3 +14,15 @@ DB_CONFIG = {
     'SSH_USER'  : os.getenv("SSH_USER"),
     'SSH_PKEY'  : os.getenv("SSH_PKEY")
 }
+
+ST_CRED = {
+    'ST_USER' : os.getenv("ST_USER"),
+    'ST_PASS' : os.getenv("ST_PASS")
+}
+
+DEFAULT_MONGO_CONFIG = {
+    "uri"                   : os.getenv("MONGO_URL_E3A"),
+    "db_name"               : og.getenv("MONGO_NAME_E3A"),
+    "collection_raw"        : "recruited_patients_raw_data",
+    "collection_features"   : "recruited_patients_data"
+}
