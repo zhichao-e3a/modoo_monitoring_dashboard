@@ -3,43 +3,47 @@ from utils.zc.zc_helpers import *
 import streamlit as st
 
 import time
+import json
 
 from websocket import create_connection, WebSocketTimeoutException
 
-st.set_page_config(page_title="Zhichao", page_icon=":hospital:", layout="wide")
-st.title("Run Data Pipeline")
-st.divider()
+st.set_page_config(page_title="Historical Pipeline", layout="wide")
 
-if "job_id" not in st.session_state:
-    st.session_state.job_id = None
+st.session_state.job_id = None
 
-if "logs" not in st.session_state:
-    st.session_state.logs = []
+with st.container(vertical_alignment="center", horizontal_alignment="center"):
 
-with st.container():
-
+    # Each button triggers a re-run and will flag it as True
     left, mid, right = st.columns(3)
 
     with left:
-
-        if st.button("Run", width="stretch"):
-            start = time.perf_counter()
-            response = requests.post("http://127.0.0.1:8000/run_pipeline")
-            response.raise_for_status()
-            st.session_state.job_id = response.json()["job_id"]
-            st.toast(f"Pipeline started: {st.session_state.job_id}")
+        run_button      = st.button("Run", width="stretch")
 
     with mid:
-
-        if st.button("Restart", width="stretch"):
-            st.snow()
+        restart_button  = st.button("Restart", width="stretch")
 
     with right:
+        logs_button     = st.button("View Logs", width="stretch")
 
-        if st.button("View Logs", width="stretch"):
-            st.toast("Feature not done hehe")
+if run_button:
+
+    response = requests.post("http://127.0.0.1:8000/run_pipeline")
+    response.raise_for_status()
+    st.session_state.job_id = response.json()["job_id"]
+
+if restart_button:
+
+    st.snow()
+    st.toast(f"Session restarted")
+    st.session_state.job_id = None
+
+if logs_button:
+
+    st.toast("Feature not done hehe")
 
 if st.session_state.job_id:
+
+    st.toast(f"Pipeline started: {st.session_state.job_id}")
 
     ws = create_connection(
         f"ws://127.0.0.1:8000/ws/status/{st.session_state.job_id}",
@@ -80,14 +84,8 @@ if st.session_state.job_id:
                     with st.empty() as empty:
                         st.write(f"{log_message}\n")
 
-                    if log_message not in st.session_state.logs:
-                        print(log_message)
-                        st.session_state.logs.append(log_message)
-
                     if state == "completed":
-                        end = time.perf_counter()
                         status.update(state="complete")
-                        status_message = f"Pipeline completed in {(end - start):.2f} seconds"
                         st.balloons()
                         break
 
@@ -95,7 +93,5 @@ if st.session_state.job_id:
                         status.update(label="Pipeline failed", state="error")
                         st.error("Pipeline failed")
                         break
-
-                # time.sleep(5)
         finally:
             ws.close()

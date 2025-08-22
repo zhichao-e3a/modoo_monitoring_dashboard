@@ -22,7 +22,7 @@ ST_CRED = {
 
 DEFAULT_MONGO_CONFIG = {
     "uri"                   : os.getenv("MONGO_URL_E3A"),
-    "db_name"               : og.getenv("MONGO_NAME_E3A"),
+    "db_name"               : os.getenv("MONGO_NAME_E3A"),
     "collection_raw"        : "recruited_patients_raw_data",
     "collection_features"   : "recruited_patients_data"
 }
