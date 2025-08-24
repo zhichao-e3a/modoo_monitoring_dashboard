@@ -27,7 +27,7 @@ with st.container(vertical_alignment="center", horizontal_alignment="center"):
 
 if run_button:
 
-    response = requests.post("http://127.0.0.1:8000/run_pipeline")
+    response = requests.post("http://127.0.0.1:8000/run_hist_pipeline")
     response.raise_for_status()
     st.session_state.job_id = response.json()["job_id"]
 
@@ -54,12 +54,6 @@ if st.session_state.job_id:
     ws.settimeout(1)
 
     with st.status(label=f"`{st.session_state.job_id}`", expanded=True) as status:
-
-        if st.button("Stop Running (Restarts Session)"):
-            for key in st.session_state.keys():
-                if key != "logged_in":
-                    del st.session_state[key]
-            st.rerun()
 
         bar = st.progress(0)
 

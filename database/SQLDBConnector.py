@@ -7,7 +7,7 @@ from sshtunnel import SSHTunnelForwarder
 from sqlalchemy import create_engine
 from sqlalchemy.engine import URL
 
-class DatabaseConnector:
+class SQLDBConnector:
 
     def __init__(self):
         pass

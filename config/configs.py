@@ -26,3 +26,8 @@ DEFAULT_MONGO_CONFIG = {
     "collection_raw"        : "recruited_patients_raw_data",
     "collection_features"   : "recruited_patients_data"
 }
+
+MONGO_CONFIG = {
+    'DB_HOST' : os.getenv("MONGO_URL"),
+    'DB_NAME' : os.getenv("MONGO_NAME")
+}
