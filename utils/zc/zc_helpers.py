@@ -1,73 +1,10 @@
 from config.configs import ST_CRED
 
-import requests
 import pandas as pd
 import streamlit as st
 from datetime import timedelta, datetime
 
-def format_excel_data(main_df, pre_df):
-
-    merged_df = pd.merge(main_df, pre_df, left_on="联系方式", right_on="2.电话号码", how="left")
-
-    formatted_data  = []
-    skipped         = 0
-
-    for idx, row in merged_df.iterrows():
-
-        if pd.isna(row["联系方式"]):
-            continue
-
-        contact                     = row["联系方式"]
-        data_origin                 = row["data_origin"]
-        delivery_mode               = row["delivery_mode"]
-        last_menstrual_str          = row["7.您的最后一次月经大概是什么时候？"]
-        expected_delivery_timestamp = row["预产期"]
-        actual_delivery_timestamp   = row["实际出生日期"]
-        actual_delivery_time        = row["实际出生时间 (HH:MM:SS)"]
-
-        # last_menstrual_str        %d/%m/%Y            (str)                   Nullable
-        # expected_delivery_date    %Y/%m/%d            (timestamps.Timestamp)  Non-nullable
-        # actual_delivery_date      %Y/%m/%d            (timestamps.Timestamp)  Nullable
-        # actual_delivery_time      HH:MM:SS            (datetime.time)         Nullable
-        # onset_time                %Y/%m/%d HH:MM:SS   (timestamps.Timestamp)  Nullable
-
-        last_menstrual_datetime = datetime.strptime(
-            last_menstrual_str,
-            "%d/%m/%Y"
-        ).strftime("%Y-%m-%d %H:%M:%S") if not pd.isna(last_menstrual_str) else None
-
-        expected_delivery_datetime = expected_delivery_timestamp.strftime("%Y-%m-%d %H:%M:%S")
-
-        if not pd.isna(actual_delivery_timestamp) and not pd.isna(actual_delivery_time):
-            actual_delivery_datetime = datetime.combine(
-                actual_delivery_timestamp.to_pydatetime().date(),
-                actual_delivery_time
-            )
-        elif not pd.isna(actual_delivery_timestamp):
-            actual_delivery_datetime = actual_delivery_timestamp
-        else:
-            actual_delivery_datetime = None
-
-        if not pd.isna(actual_delivery_datetime):
-            onset_datetime = get_labor_onset(row, actual_delivery_datetime)
-        else:
-            onset_datetime = None
-
-        data = {
-            "contact"                   : str(int(contact)),
-            "data_origin"               : data_origin,
-            "delivery_mode"             : delivery_mode,
-            "last_menstrual_datetime"   : last_menstrual_datetime,
-            "expected_delivery_date"    : expected_delivery_datetime,
-            "actual_delivery_datetime"  : actual_delivery_datetime.strftime("%Y-%m-%d %H:%M:%S") if actual_delivery_datetime else None,
-            "onset_datetime"            : onset_datetime.strftime("%Y-%m-%d %H:%M:%S") if onset_datetime else None
-        }
-
-        formatted_data.append(data)
-
-    return formatted_data
-
-def get_labor_onset(row, actual_delivery_datetime):
+def get_labor_onset(row, actual_delivery_str):
 
     """
     Date of labor onset
@@ -75,7 +12,7 @@ def get_labor_onset(row, actual_delivery_datetime):
     ADD - (c2 + c3) if c1 not present
     """
 
-    add = actual_delivery_datetime
+    add = datetime.strptime(actual_delivery_str, "%Y-%m-%d %H:%M:%S")
     c1  = row.iloc[11]
     c2  = row.iloc[12]
     c3  = row.iloc[13]
@@ -97,63 +34,137 @@ def get_labor_onset(row, actual_delivery_datetime):
     elif not pd.isna(c3):
         onset = add - timedelta(minutes=c3)
 
+    if onset:
+        return onset.strftime("%Y-%m-%d %H:%M:%S")
+
     return onset
 
-def get_query_string(df_excel):
+def format_excel_data(main_df, pre_df):
 
-    to_return = ""
+    merged_df = pd.merge(main_df, pre_df, left_on="联系方式", right_on="2.电话号码", how="left")
 
-    for _, i in enumerate(df_excel["联系方式"]):
+    formatted_data  = []
 
-        if not pd.isna(i):
-            to_return += f"'{int(i)}',"
+    for idx, row in merged_df.iterrows():
 
-        else:
-            print(f"Patient {_+1} has no number")
+        if pd.isna(row["联系方式"]):
+            continue
 
-    return to_return
+        # last_menstrual_str        %d/%m/%Y            (str)                   Nullable (None)
+        # expected_delivery_date    %Y-%m-%d            (timestamps.Timestamp)  Non-nullable
+        # actual_delivery_date      %Y-%m-%d            (timestamps.Timestamp)  Nullable (NaT)
+        # actual_delivery_time      HH:MM:SS            (datetime.time)         Nullable (Float)
+        # onset_time (obtained)     %Y-%m-%d HH:MM:SS   (timestamps.Timestamp)  Nullable (NaT)
+        # onset_date                %Y-%m-%d            (timestamps.Timestamp)  Nullable (NaT)
+        # onset_time                %Y-%m-%d            (datetime.time)         Nullable (Float)
 
-def merge_excel_sql(list_excel, df_sql):
+        contact                     = row["联系方式"]
+        data_origin                 = row["data_origin"]
+        delivery_mode               = row["delivery_mode"] if not pd.isna(row["delivery_mode"]) else None
 
-    all_merged_data = []
+        # Last Menstrual Time
+        last_menstrual_str          = row["7.您的最后一次月经大概是什么时候？"]
+        last_menstrual              = datetime.strptime(
+            last_menstrual_str,
+            "%d/%m/%Y"
+        ).strftime("%Y-%m-%d %H:%M:%S") if not pd.isna(last_menstrual_str) else None
+        # last_menstrual : %Y-%m-%d %H:%M:%S or None
 
-    for patient in list_excel:
+        # Expected Delivery Time
+        expected_delivery_date = row["预产期"]
+        expected_delivery  = expected_delivery_date.strftime("%Y-%m-%d %H:%M:%S")
+        # expected_delivery : %Y-%m-%d %H:%M:%S
 
-        mobile = patient["contact"]
+        # Actual Delivery Time
+        actual_delivery_date    = row["实际出生日期"]
+        actual_delivery_time    = row["实际出生时间 (HH:MM:SS)"]
+        actual_delivery         = None
+        if not pd.isna(actual_delivery_date) and not pd.isna(actual_delivery_time):
+            actual_delivery = datetime.combine(
+                actual_delivery_date.to_pydatetime().date(),
+                actual_delivery_time
+            ).strftime("%Y-%m-%d %H:%M:%S")
+        elif not pd.isna(actual_delivery_date):
+            actual_delivery = actual_delivery_date.strftime("%Y-%m-%d %H:%M:%S")
+        # actual_delivery : %Y-%m-%d %H:%M:%S or None
 
-        for _, measurement in df_sql.iterrows():
+        # Onset Time
+        onset = None
+        if row["delivery_mode"] != "c-section": # If C-section delivery, onset not used
 
-            if measurement["mobile"] == mobile:
+            if data_origin == "recruited": # If Recruited use actual delivery (if exists) to calculate
 
-                merged_data = {
-                    "id"                    : measurement["id"],
-                    "mobile"                : measurement["mobile"],
-                    "start_ts"              : datetime\
-                        .fromtimestamp(int(measurement["start_ts"]))\
-                        .strftime("%Y-%m-%d %H:%M:%S"),
-                    "data_origin"           : patient["data_origin"],
-                    "delivery_mode"         : patient["delivery_mode"],
-                    "contraction_url"       : measurement["contraction_url"],
-                    "hb_baby_url"           : measurement["hb_baby_url"],
-                    "conclusion"            : measurement["conclusion"],
-                    "basic_info"            : measurement["basic_info"],
-                    "last_menstrual_date"   : patient["last_menstrual_datetime"],
-                    "expected_born_date"    : patient["expected_delivery_date"],
-                    "end_born_ts"           : patient["actual_delivery_datetime"],
-                    "onset"                 : patient["onset_datetime"]
-                }
+                if not pd.isna(actual_delivery):
+                    onset = get_labor_onset(row, actual_delivery)
 
-                all_merged_data.append(merged_data)
+            elif data_origin == "historical": # If historical derive from Excel field directly
 
-    return all_merged_data
+                onset_date = row["onset_date"]
+                onset_time = row["onset_time (HH:MM)"]
+                if not pd.isna(onset_date) and not pd.isna(onset_time):
+                    onset = datetime.combine(
+                        onset_date.to_pydatetime().date(),
+                        onset_time
+                    ).strftime("%Y-%m-%d %H:%M:%S")
+                elif not pd.isna(onset_date):
+                    onset = onset_date.strftime("%Y-%m-%d %H:%M:%S")
 
-def run_rec_pipeline():
+        data = {
+            "contact"                   : str(int(contact)),
+            "data_origin"               : data_origin,
+            "delivery_mode"             : delivery_mode,
+            "last_menstrual"            : last_menstrual,
+            "expected_delivery"         : expected_delivery,
+            "actual_delivery"           : actual_delivery,
+            "onset"                     : onset
+        }
 
-    requests.get("http://127.0.0.1:8000/run_rec_pipeline")
+        formatted_data.append(data)
 
-def run_hist_pipeline():
+    return formatted_data
 
-    requests.get("http://127.0.0.1:8000/run_hist_pipeline")
+def consolidate_data(patients, measurements, data_origin):
+
+    patients_df     = pd.DataFrame(patients)
+    measurements_df = pd.DataFrame(measurements)
+
+    merged          = pd.merge(
+        measurements_df,
+        patients_df,
+        left_on     = "mobile",
+        right_on    = "_id",
+        how         = "left"
+    )
+
+    consolidated_data = []
+
+    for idx, row in merged.iterrows():
+
+        data = {
+            "row_id"            : row["_id_x"],
+            "mobile"            : row["mobile"],
+            "measurement_date"  : row["measurement_date"],
+            "uc"                : row["uc"],
+            "fhr"               : row["fhr"],
+            "gest_age"          : row["gest_age"],
+            "onset"             : row["onset"]
+        }
+
+        if data_origin == "recruited":
+            data["edd"] = row["expected_delivery"]
+            data["add"] = row["actual_delivery"]
+        elif data_origin == "historical":
+            data["edd"] = row["expected_delivery_x"]
+            data["add"] = row["actual_delivery_x"]
+
+        if not row["gest_age"] and not row["last_menstrual_datetime"]:
+
+            diff = datetime.strptime(row["measurement_date"], "%Y-%m-%d %H:%M:%S") - datetime.strptime(row["last_menstrual_datetime"], "%Y-%m-%d %H:%M:%S")
+            data["gest_age"] = diff.days
+
+        consolidated_data.append(data)
+
+    return consolidated_data
 
 def verify_login(username, password):
 

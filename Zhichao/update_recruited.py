@@ -6,7 +6,9 @@ import streamlit as st
 
 import asyncio
 
-st.set_page_config(page_title="Recruited Pipeline", layout="wide")
+st.set_page_config(page_title="Update Recruited Patients", layout="wide")
+st.title("Update Recruited Patients")
+st.divider()
 
 if "main_csv" not in st.session_state:
     st.session_state.main_csv = None
@@ -55,7 +57,14 @@ if st.session_state.main_csv and st.session_state.pre_csv:
 
         st.write(":material/database_upload: Uploading to MongoDB (consolidated_patients)")
         asyncio.run(mongo.upsert_records(formatted_excel, "consolidated_patients"))
+        st.balloons()
         st.write(f":material/done_outline: Uploaded {rows_added_raw} rows to MongoDB (consolidated_patients)")
+
+        st.session_state.main_csv       = None
+        st.session_state.pre_csv        = None
+        st.session_state.upload_data    = None
+
+        st.rerun()
 
     else:
 

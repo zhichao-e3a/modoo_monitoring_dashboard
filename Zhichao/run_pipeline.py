@@ -1,13 +1,14 @@
-from utils.zc.zc_helpers import *
-
 import streamlit as st
 
 import time
 import json
+import requests
 
 from websocket import create_connection, WebSocketTimeoutException
 
-st.set_page_config(page_title="Historical Pipeline", layout="wide")
+st.set_page_config(page_title="Run Data Pipeline", layout="wide")
+st.title("Run Data Pipeline")
+st.divider()
 
 if "choice" not in st.session_state:
     st.session_state.choice = None
@@ -19,7 +20,6 @@ if not st.session_state.choice:
 
     with st.container(vertical_alignment="center", horizontal_alignment="center"):
 
-        print(st.session_state.choice)
         left, right = st.columns(2)
 
         with left:
