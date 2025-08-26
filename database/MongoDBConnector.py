@@ -107,12 +107,14 @@ class MongoDBConnector:
 
             return count
 
-    async def get_all_documents(self, coll_name, projection=None, batch_size=1000):
+    async def get_all_documents(self, coll_name, query={}, projection=None, batch_size=1000):
 
         async with self.resource(coll_name) as coll:
 
             try:
-                cursor = coll.find({})
+
+                cursor = coll.find(query)
+
                 if batch_size:
                     cursor = cursor.batch_size(batch_size)
                 return [doc async for doc in cursor]
