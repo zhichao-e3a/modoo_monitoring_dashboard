@@ -14,8 +14,11 @@ from websocket import create_connection, WebSocketTimeoutException
 
 st.set_page_config(page_title="Recruited Pipeline", layout="wide")
 
-if "csv" not in st.session_state:
-    st.session_state.csv = None
+if "main_csv" not in st.session_state:
+    st.session_state.main_csv = None
+
+if "pre_csv" not in st.session_state:
+    st.session_state.pre_csv = None
 
 if "start_pipeline" not in st.session_state:
     st.session_state.start_pipeline = None
@@ -23,20 +26,33 @@ if "start_pipeline" not in st.session_state:
 if "job_id" not in st.session_state:
     st.session_state.job_id = None
 
-if not st.session_state.csv:
+if not st.session_state.main_csv:
 
-    st.session_state.csv = st.file_uploader(
+    st.session_state.main_csv = st.file_uploader(
         "Upload Recruited Patients XLSX file",
         type = "xlsx",
         accept_multiple_files = False
     )
 
-if st.session_state.csv:
+if not st.session_state.pre_csv:
+
+    st.session_state.pre_csv = st.file_uploader(
+        "Upload Pre-Survey CSV file",
+        type = "csv",
+        accept_multiple_files = False
+    )
+
+if st.session_state.main_csv and st.session_state.pre_csv:
 
     place       = st.empty()
-    df_place    = st.empty()
-    file        = st.session_state.csv
-    df          = pd.read_excel(file)
+
+    main_file   = st.session_state.main_csv
+    main_file.seek(0)
+    main_df     = pd.read_excel(main_file)
+
+    pre_file    = st.session_state.pre_csv
+    pre_file.seek(0)
+    pre_df      = pd.read_csv(pre_file)
 
     if st.session_state.start_pipeline:
 
@@ -47,16 +63,24 @@ if st.session_state.csv:
             # Start merge data
             db      = SQLDBConnector()
             mongo   = MongoDBConnector()
+
+            place.write(":material/database: Querying MySQL")
             sql_df  = db.query_to_dataframe(
                 RECRUITED.format(
-                    numbers=get_query_string(df)[:-1],
+                    numbers=get_query_string(main_df)[:-1],
                     start="'2025-03-01 00:00:00'",
-                    end="'2025-08-22 00:00:00'"
+                    end=f"'{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}'"
                 )
             )
-            formatted_excel = format_excel_data(df)
+            place.write(f":material/done_outline: Queried {len(sql_df)} rows, {len(sql_df.columns)} columns")
+
+            formatted_excel = format_excel_data(main_df, pre_df)
+
             merged_list     = merge_excel_sql(formatted_excel, sql_df)
+            rows_added_raw  = len(merged_list) - asyncio.run(mongo.count_documents("rec_merged_data"))
+            place.write(":material/database_upload: Uploading to MongoDB (rec_merged_data)")
             asyncio.run(mongo.upsert_records(merged_list, "rec_merged_data"))
+            place.write(f":material/done_outline: Uploaded {rows_added_raw} rows to MongoDB (rec_raw_data)")
             # End merge data
 
             # Start get job ID
@@ -95,8 +119,7 @@ if st.session_state.csv:
 
                         bar.progress(progress, text=f"{progress}%")
 
-                        with st.empty() as empty:
-                            st.write(f"{log_message}\n")
+                        place.write(f"{log_message}\n")
 
                         if state == "completed":
                             status.update(state="complete")
@@ -122,7 +145,8 @@ if st.session_state.csv:
             with right:
                 reupload_button = st.button("Reupload", width="stretch")
 
-            df_place.dataframe(df)
+            st.dataframe(main_df)
+            st.dataframe(pre_df)
 
         if continue_button:
 
@@ -131,6 +155,8 @@ if st.session_state.csv:
 
         elif reupload_button:
 
-            st.session_state.csv = None
+            st.session_state.csv        = None
+            st.session_state.pre_csv    = None
+            st.session_state.post_csv   = None
             st.rerun()
 

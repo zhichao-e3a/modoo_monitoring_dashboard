@@ -64,6 +64,17 @@ class MongoDBConnector:
                 to_insert = UpdateOne({"_id": _id}, {"$set": to_insert}, upsert=True)
                 await self.flush(coll, [to_insert])
 
+            elif coll_name == "consolidated_patients":
+
+                for item in records:
+
+                    _id = item.get("contact")
+                    to_insert = dict(item)
+                    to_insert.pop("contact")
+
+                    to_insert = UpdateOne({"_id": _id}, {"$set": to_insert}, upsert=True)
+                    await self.flush(coll, [to_insert])
+
             else:
 
                 ops = []

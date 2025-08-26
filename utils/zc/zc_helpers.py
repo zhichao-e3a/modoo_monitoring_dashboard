@@ -3,9 +3,71 @@ from config.configs import ST_CRED
 import requests
 import pandas as pd
 import streamlit as st
-from datetime import timedelta
+from datetime import timedelta, datetime
 
-def get_labor_onset_list(df_excel):
+def format_excel_data(main_df, pre_df):
+
+    merged_df = pd.merge(main_df, pre_df, left_on="联系方式", right_on="2.电话号码", how="left")
+
+    formatted_data  = []
+    skipped         = 0
+
+    for idx, row in merged_df.iterrows():
+
+        if pd.isna(row["联系方式"]):
+            continue
+
+        contact                     = row["联系方式"]
+        data_origin                 = row["data_origin"]
+        delivery_mode               = row["delivery_mode"]
+        last_menstrual_str          = row["7.您的最后一次月经大概是什么时候？"]
+        expected_delivery_timestamp = row["预产期"]
+        actual_delivery_timestamp   = row["实际出生日期"]
+        actual_delivery_time        = row["实际出生时间 (HH:MM:SS)"]
+
+        # last_menstrual_str        %d/%m/%Y            (str)                   Nullable
+        # expected_delivery_date    %Y/%m/%d            (timestamps.Timestamp)  Non-nullable
+        # actual_delivery_date      %Y/%m/%d            (timestamps.Timestamp)  Nullable
+        # actual_delivery_time      HH:MM:SS            (datetime.time)         Nullable
+        # onset_time                %Y/%m/%d HH:MM:SS   (timestamps.Timestamp)  Nullable
+
+        last_menstrual_datetime = datetime.strptime(
+            last_menstrual_str,
+            "%d/%m/%Y"
+        ).strftime("%Y-%m-%d %H:%M:%S") if not pd.isna(last_menstrual_str) else None
+
+        expected_delivery_datetime = expected_delivery_timestamp.strftime("%Y-%m-%d %H:%M:%S")
+
+        if not pd.isna(actual_delivery_timestamp) and not pd.isna(actual_delivery_time):
+            actual_delivery_datetime = datetime.combine(
+                actual_delivery_timestamp.to_pydatetime().date(),
+                actual_delivery_time
+            )
+        elif not pd.isna(actual_delivery_timestamp):
+            actual_delivery_datetime = actual_delivery_timestamp
+        else:
+            actual_delivery_datetime = None
+
+        if not pd.isna(actual_delivery_datetime):
+            onset_datetime = get_labor_onset(row, actual_delivery_datetime)
+        else:
+            onset_datetime = None
+
+        data = {
+            "contact"                   : str(int(contact)),
+            "data_origin"               : data_origin,
+            "delivery_mode"             : delivery_mode,
+            "last_menstrual_datetime"   : last_menstrual_datetime,
+            "expected_delivery_date"    : expected_delivery_datetime,
+            "actual_delivery_datetime"  : actual_delivery_datetime.strftime("%Y-%m-%d %H:%M:%S") if actual_delivery_datetime else None,
+            "onset_datetime"            : onset_datetime.strftime("%Y-%m-%d %H:%M:%S") if onset_datetime else None
+        }
+
+        formatted_data.append(data)
+
+    return formatted_data
+
+def get_labor_onset(row, actual_delivery_datetime):
 
     """
     Date of labor onset
@@ -13,62 +75,29 @@ def get_labor_onset_list(df_excel):
     ADD - (c2 + c3) if c1 not present
     """
 
-    onset_list = []
+    add = actual_delivery_datetime
+    c1  = row.iloc[11]
+    c2  = row.iloc[12]
+    c3  = row.iloc[13]
+    c4  = row.iloc[14]
 
-    for _, row in df_excel.iterrows():
+    onset = None
+    if not pd.isna(c4):
+        pass
+    # Has c1 ; Use c1 first
+    elif not pd.isna(c1):
+        onset = add - timedelta(minutes=c1)
+    # Have both c2 and c3 ; Use both
+    elif not pd.isna(c2) and not pd.isna(c3):
+        onset = add - timedelta(minutes=c2) - timedelta(minutes=c3)
+    # Only has c2 ; Use c2 only (c3 defaults to 0)
+    elif not pd.isna(c2):
+        onset = add - timedelta(minutes=c2)
+    # Only has c3 ; Use c3 only (c2 defaults to 0)
+    elif not pd.isna(c3):
+        onset = add - timedelta(minutes=c3)
 
-        add = row["实际出生日期"]
-        c1  = row.iloc[11]
-        c2  = row.iloc[12]
-        c3  = row.iloc[13]
-        c4  = row.iloc[14]
-
-        onset = None
-        if not pd.isna(c4):
-            pass
-        # Has c1 ; Use c1 first
-        elif not pd.isna(c1):
-            onset = add - timedelta(minutes=c1)
-        # Have both c2 and c3 ; Use both
-        elif not pd.isna(c2) and not pd.isna(c3):
-            onset = add - timedelta(minutes=c2) - timedelta(minutes=c3)
-        # Only has c2 ; Use c2 only (c3 defaults to 0)
-        elif not pd.isna(c2):
-            onset = add - timedelta(minutes=c2)
-        # Only has c3 ; Use c3 only (c2 defaults to 0)
-        elif not pd.isna(c3):
-            onset = add - timedelta(minutes=c3)
-
-        onset_list.append(onset)
-
-    return onset_list
-
-def format_excel_data(df_excel):
-
-    onset_list      = get_labor_onset_list(df_excel)
-    formatted_data  = []
-
-    for idx, row in df_excel.iterrows():
-
-        if pd.isna(row["联系方式"]):
-            continue
-
-        data = {
-            "name"                  : row["用户"],
-            "mobile"                : str(int(row["联系方式"])),
-            "pre_survey"            : row["产前问卷填写"],
-            "post_survey"           : row["产后问卷填写"],
-            "asked"                 : row["Asked onset of labor?"],
-            "replied"               : row["Replied?"],
-            "reply"                 : row["Reply"],
-            "expected_born_date"    : row["预产期"],
-            "end_born_ts"           : row["实际出生日期"],
-            "onset"                 : onset_list[idx]
-        }
-
-        formatted_data.append(data)
-
-    return formatted_data
+    return onset
 
 def get_query_string(df_excel):
 
@@ -90,25 +119,28 @@ def merge_excel_sql(list_excel, df_sql):
 
     for patient in list_excel:
 
-        mobile = patient["mobile"]
+        mobile = patient["contact"]
 
         for _, measurement in df_sql.iterrows():
 
             if measurement["mobile"] == mobile:
 
                 merged_data = {
-                    "mobile"                : measurement["mobile"],
                     "id"                    : measurement["id"],
-                    "user_id"               : measurement["user_id"],
-                    "start_ts"              : measurement["start_ts"],
+                    "mobile"                : measurement["mobile"],
+                    "start_ts"              : datetime\
+                        .fromtimestamp(int(measurement["start_ts"]))\
+                        .strftime("%Y-%m-%d %H:%M:%S"),
+                    "data_origin"           : patient["data_origin"],
+                    "delivery_mode"         : patient["delivery_mode"],
                     "contraction_url"       : measurement["contraction_url"],
                     "hb_baby_url"           : measurement["hb_baby_url"],
                     "conclusion"            : measurement["conclusion"],
                     "basic_info"            : measurement["basic_info"],
-                    "gest_age"              : None,
-                    "expected_born_date"    : patient["expected_born_date"] if not pd.isna(patient["expected_born_date"]) else None,
-                    "end_born_ts"           : patient["end_born_ts"] if not pd.isna(patient["end_born_ts"]) else None,
-                    "onset"                 : patient["onset"] if not pd.isna(patient["onset"]) else None
+                    "last_menstrual_date"   : patient["last_menstrual_datetime"],
+                    "expected_born_date"    : patient["expected_delivery_date"],
+                    "end_born_ts"           : patient["actual_delivery_datetime"],
+                    "onset"                 : patient["onset_datetime"]
                 }
 
                 all_merged_data.append(merged_data)
