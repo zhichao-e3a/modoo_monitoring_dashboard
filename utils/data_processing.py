@@ -1,7 +1,4 @@
-from config.configs import ST_CRED
-
 import pandas as pd
-import streamlit as st
 from datetime import timedelta, datetime
 
 def get_labor_onset(row, actual_delivery_str):
@@ -166,18 +163,3 @@ def consolidate_data(patients, measurements, data_origin):
 
     return consolidated_data
 
-def verify_login(username, password):
-
-    if not username:
-        st.warning("Please enter your username")
-
-    elif not password:
-        st.warning("Please enter your password")
-
-    elif username == ST_CRED["ST_USER"] and password == ST_CRED["ST_PASS"]:
-        st.success("Successfully logged in")
-        st.session_state.logged_in = True
-        st.rerun()
-
-    else:
-        st.warning("Wrong username or password")
