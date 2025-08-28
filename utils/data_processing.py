@@ -162,4 +162,3 @@ def consolidate_data(patients, measurements, data_origin):
         consolidated_data.append(data)
 
     return consolidated_data
-
