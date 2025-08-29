@@ -10,16 +10,19 @@ def get_labor_onset(row, actual_delivery_str):
     """
 
     add = datetime.strptime(actual_delivery_str, "%Y-%m-%d %H:%M:%S")
-    c1  = row.iloc[11]
-    c2  = row.iloc[12]
-    c3  = row.iloc[13]
-    c4  = row.iloc[14]
+    c1  = row.loc[
+        "1. From the start of contractions to your baby’s birth, how long did your labor last? (In minutes)"
+    ]
+    c2  = row.loc[
+        "2. From entering the delivery room to your baby’s birth, how long was the duration? (in minutes)"
+    ]
+    c3  = row.loc[
+        "3. From being informed that you were in labor to being transferred to the delivery room, how much time passed in between? (in minutes)"
+    ]
 
     onset = None
-    if not pd.isna(c4):
-        pass
     # Has c1 ; Use c1 first
-    elif not pd.isna(c1):
+    if not pd.isna(c1):
         onset = add - timedelta(minutes=c1)
     # Have both c2 and c3 ; Use both
     elif not pd.isna(c2) and not pd.isna(c3):
@@ -31,10 +34,7 @@ def get_labor_onset(row, actual_delivery_str):
     elif not pd.isna(c3):
         onset = add - timedelta(minutes=c3)
 
-    if onset:
-        return onset.strftime("%Y-%m-%d %H:%M:%S")
-
-    return onset
+    return onset.strftime("%Y-%m-%d %H:%M:%S") if onset else None
 
 def format_excel_data(main_df, pre_df):
 
@@ -44,7 +44,9 @@ def format_excel_data(main_df, pre_df):
 
     for idx, row in merged_df.iterrows():
 
-        if pd.isna(row["联系方式"]):
+        contact = row["联系方式"]
+
+        if pd.isna(contact):
             continue
 
         # last_menstrual_str        %d/%m/%Y            (str)                   Nullable (None)
@@ -55,24 +57,23 @@ def format_excel_data(main_df, pre_df):
         # onset_date                %Y-%m-%d            (timestamps.Timestamp)  Nullable (NaT)
         # onset_time                %Y-%m-%d            (datetime.time)         Nullable (Float)
 
-        contact                     = row["联系方式"]
-        data_origin                 = row["data_origin"]
-        delivery_mode               = row["delivery_mode"] if not pd.isna(row["delivery_mode"]) else None
+        data_origin     = row["data_origin"]
+        delivery_mode   = row["delivery_mode"] if not pd.isna(row["delivery_mode"]) else None
 
-        # Last Menstrual Time
-        last_menstrual_str          = row["7.您的最后一次月经大概是什么时候？"]
-        last_menstrual              = datetime.strptime(
+        # Last Menstrual
+        last_menstrual_str  = row["7.您的最后一次月经大概是什么时候？"]
+        last_menstrual      = datetime.strptime(
             last_menstrual_str,
             "%d/%m/%Y"
         ).strftime("%Y-%m-%d %H:%M:%S") if not pd.isna(last_menstrual_str) else None
         # last_menstrual : %Y-%m-%d %H:%M:%S or None
 
-        # Expected Delivery Time
-        expected_delivery_date = row["预产期"]
-        expected_delivery  = expected_delivery_date.strftime("%Y-%m-%d %H:%M:%S")
+        # Expected Delivery
+        expected_delivery_date  = row["预产期"]
+        expected_delivery       = expected_delivery_date.strftime("%Y-%m-%d %H:%M:%S")
         # expected_delivery : %Y-%m-%d %H:%M:%S
 
-        # Actual Delivery Time
+        # Actual Delivery
         actual_delivery_date    = row["实际出生日期"]
         actual_delivery_time    = row["实际出生时间 (HH:MM:SS)"]
         actual_delivery         = None
@@ -120,10 +121,10 @@ def format_excel_data(main_df, pre_df):
 
     return formatted_data
 
-def consolidate_data(patients, measurements, data_origin):
+def consolidate_data(patients, measurements):
 
-    patients_df     = pd.DataFrame(patients)
     measurements_df = pd.DataFrame(measurements)
+    patients_df     = pd.DataFrame(patients)
 
     merged          = pd.merge(
         measurements_df,
@@ -137,6 +138,10 @@ def consolidate_data(patients, measurements, data_origin):
 
     for idx, row in merged.iterrows():
 
+        if not row["onset"]:
+            print(idx, "No labour onset")
+            continue
+
         data = {
             "row_id"            : row["_id_x"],
             "mobile"            : row["mobile"],
@@ -144,20 +149,10 @@ def consolidate_data(patients, measurements, data_origin):
             "uc"                : row["uc"],
             "fhr"               : row["fhr"],
             "gest_age"          : row["gest_age"],
+            "expected_delivery" : row["expected_delivery_x"],
+            "actual_delivery"   : row["actual_delivery_x"],
             "onset"             : row["onset"]
         }
-
-        if data_origin == "recruited":
-            data["edd"] = row["expected_delivery"]
-            data["add"] = row["actual_delivery"]
-        elif data_origin == "historical":
-            data["edd"] = row["expected_delivery_x"]
-            data["add"] = row["actual_delivery_x"]
-
-        if not row["gest_age"] and not row["last_menstrual_datetime"]:
-
-            diff = datetime.strptime(row["measurement_date"], "%Y-%m-%d %H:%M:%S") - datetime.strptime(row["last_menstrual_datetime"], "%Y-%m-%d %H:%M:%S")
-            data["gest_age"] = diff.days
 
         consolidated_data.append(data)
 
