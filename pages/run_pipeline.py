@@ -1,3 +1,5 @@
+PORT    = 8000
+
 import streamlit as st
 
 import time
@@ -53,7 +55,7 @@ else:
 
     if run_button:
 
-        response = requests.post(f"http://127.0.0.1:8000/run_pipeline/{st.session_state.choice}")
+        response = requests.post(f"http://127.0.0.1:{PORT}/run_pipeline/{st.session_state.choice}")
         response.raise_for_status()
         st.session_state.job_id = response.json()["job_id"]
 
@@ -61,7 +63,7 @@ else:
 
         if st.session_state.job_id:
 
-            response = requests.post(f"http://127.0.0.1:8000/cancel/{st.session_state.job_id}")
+            response = requests.post(f"http://127.0.0.1:{PORT}/cancel/{st.session_state.job_id}")
             response.raise_for_status()
             st.snow()
             st.toast(f"Session restarted")
@@ -82,7 +84,7 @@ else:
         st.toast(f"Pipeline started: {st.session_state.job_id}")
 
         ws = create_connection(
-            f"ws://127.0.0.1:8000/ws/status/{st.session_state.job_id}",
+            f"ws://127.0.0.1:{PORT}/ws/status/{st.session_state.job_id}",
             origin="http://localhost:8501",
             timeout=1,
         )
