@@ -6,8 +6,8 @@ import streamlit as st
 
 import asyncio
 
-st.set_page_config(page_title="Update Consolidated Database", layout="wide")
-st.title("Update Consolidated Data")
+st.set_page_config(page_title="Update Model Data", layout="wide")
+st.title("Update Model Data")
 st.divider()
 
 if "start" not in st.session_state:

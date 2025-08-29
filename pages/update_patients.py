@@ -6,8 +6,8 @@ import streamlit as st
 
 import asyncio
 
-st.set_page_config(page_title="Update Recruited Patients", layout="wide")
-st.title("Update Recruited Patients")
+st.set_page_config(page_title="Update Patients", layout="wide")
+st.title("Update Patients")
 st.divider()
 
 if "main_csv" not in st.session_state:

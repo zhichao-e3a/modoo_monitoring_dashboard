@@ -1,4 +1,6 @@
-from utils.data_processing import *
+from utils.general import *
+
+import streamlit as st
 
 st.set_page_config(page_title="E3A AI Monitoring Dashboard", page_icon=":hospital:", layout="wide")
 st.title("E3A Healthcare (AI Monitoring Dashboard)")
