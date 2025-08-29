@@ -36,27 +36,36 @@ if st.session_state.start:
 
         mongo   = MongoDBConnector()
 
-        all_patients = asyncio.run(mongo.get_all_documents(coll_name="consolidated_patients"))
+        all_patients = asyncio.run(
+            mongo.get_all_documents(coll_name="consolidated_patients")
+        )
         rec_patients, hist_patients = [], []
 
         for patient in all_patients:
-            if patient["data_origin"] == "recruited":
+
+            data_origin = patient["data_origin"]
+
+            if data_origin == "recruited":
                 rec_patients.append(patient)
-            elif patient["data_origin"] == "historical":
+            elif data_origin == "historical":
                 hist_patients.append(patient)
 
-        rec_measurements    = asyncio.run(mongo.get_all_documents(
-            coll_name       = "rec_processed_data",
-            query           = {"mobile" : {"$in" : [i["_id"] for i in rec_patients]}}
-        ))
+        rec_measurements    = asyncio.run(
+            mongo.get_all_documents(
+                coll_name   = "rec_processed_data",
+                query       = {"mobile" : {"$in" : [i["_id"] for i in rec_patients]}}
+            )
+        )
 
-        hist_measurements   = asyncio.run(mongo.get_all_documents(
-            coll_name   = "hist_processed_data",
-            query       = {"mobile" : {"$in" : [i["_id"] for i in hist_patients]}}
-        ))
+        hist_measurements   = asyncio.run(
+            mongo.get_all_documents(
+                coll_name   = "hist_processed_data",
+                query       = {"mobile" : {"$in" : [i["_id"] for i in hist_patients]}}
+            )
+        )
 
-        rec_data    = consolidate_data(rec_patients, rec_measurements, "recruited")
-        hist_data   = consolidate_data(hist_patients, hist_measurements, "historical")
+        rec_data    = consolidate_data(rec_patients, rec_measurements)
+        hist_data   = consolidate_data(hist_patients, hist_measurements)
 
-        asyncio.run(mongo.upsert_records(rec_data, "consolidated_data"))
-        asyncio.run(mongo.upsert_records(hist_data, "consolidated_data"))
+        asyncio.run(mongo.upsert_records_hashed(rec_data, "consolidated_data"))
+        asyncio.run(mongo.upsert_records_hashed(hist_data, "consolidated_data"))
