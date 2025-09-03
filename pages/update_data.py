@@ -34,7 +34,7 @@ if st.session_state.start:
 
     with st.status(label="Merging data", expanded=True) as status:
 
-        mongo   = MongoDBConnector()
+        mongo   = MongoDBConnector(remote=False)
 
         all_patients = asyncio.run(
             mongo.get_all_documents(coll_name="consolidated_patients")
