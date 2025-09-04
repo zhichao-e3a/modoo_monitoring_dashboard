@@ -71,11 +71,11 @@ else:
             response.raise_for_status()
             st.session_state.choice = None
             st.session_state.job_id = None
-            st.rerun()
 
         else:
             st.session_state.choice = None
-            st.rerun()
+
+        st.rerun()
 
     if logs_button:
 
@@ -116,14 +116,15 @@ else:
                         bar.progress(progress, text=f"{progress}%")
 
                         with st.empty() as empty:
-                            st.write(f"{log_message}\n")
+                            st.write(f"{log_message}")
 
                         if state == "completed":
+                            bar.progress(100)
                             status.update(state="complete")
                             st.balloons()
                             break
 
-                        if state in ("failed", "unknown"):
+                        if state in ("failed", "error"):
                             status.update(label="Pipeline failed", state="error")
                             st.error("Pipeline failed")
                             break

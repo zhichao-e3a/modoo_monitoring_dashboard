@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parent
 
 LOGIN               = ROOT / "pages" / "login.py"
 DATA_MONITORING     = ROOT / "pages" / "etl_monitoring.py"
-UPDATE_CONSOLIDATED = ROOT / "pages" / "update_data.py"
+UPDATE_CONSOLIDATED = ROOT / "pages" / "run_update.py"
 UPDATE_HISTORICAL   = ROOT / "pages" / "run_pipeline.py"
 
 login_page                  = st.Page(LOGIN, title="Login")
