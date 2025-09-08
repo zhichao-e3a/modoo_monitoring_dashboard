@@ -42,16 +42,13 @@ else:
     with st.container(vertical_alignment="center", horizontal_alignment="center"):
 
         # Each button triggers a re-run and will flag it as True
-        left, mid, right = st.columns(3)
+        left, right = st.columns(2)
 
         with left:
             run_button      = st.button("Run", width="stretch")
 
-        with mid:
-            restart_button  = st.button("Restart", width="stretch")
-
         with right:
-            logs_button     = st.button("View Logs", width="stretch")
+            restart_button  = st.button("Restart", width="stretch")
 
     if run_button:
 
@@ -76,10 +73,6 @@ else:
             st.session_state.choice = None
 
         st.rerun()
-
-    if logs_button:
-
-        st.toast("Feature not done hehe")
 
     if st.session_state.job_id:
 
