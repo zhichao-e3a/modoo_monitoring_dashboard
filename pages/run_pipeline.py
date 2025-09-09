@@ -1,125 +1,215 @@
-PORT = 8502
+from __future__ import annotations
+
+from resources.styles import BADGE_CSS
 
 import streamlit as st
 
-import time
 import json
+import time
+import contextlib
+from dataclasses import dataclass
+
 import requests
+from websocket import create_connection, WebSocketTimeoutException, WebSocketConnectionClosedException
 
-from websocket import create_connection, WebSocketTimeoutException
+PORT        = 8502
+API_BASE    = f"http://127.0.0.1:{PORT}/v1/api"
+WS_BASE     = f"ws://127.0.0.1:{PORT}/v1/ws"
+TIMEOUT     = (
+    5,  # Connect
+    30  # Read
+)
 
-st.set_page_config(page_title="Run Data Pipeline", layout="wide")
-st.title("Run Data Pipeline")
-st.divider()
+st.set_page_config(
+    page_title="Run Data Pipeline",
+    layout="wide"
+)
+
+st.markdown(BADGE_CSS, unsafe_allow_html=True)
 
 if "choice" not in st.session_state:
-    st.session_state.choice = None
+    st.session_state.choice: str | None = None
+if "job_id_pipeline" not in st.session_state:
+    st.session_state.job_id_pipeline: str | None = None
+if "progress" not in st.session_state:
+    st.session_state.progress: int = 0
 
-if "job_id" not in st.session_state:
-    st.session_state.job_id = None
+@dataclass
+class ApiError(Exception):
+    message: str
+    status_code: int | None = None
+
+def start_job(choice: str) -> str:
+
+    try:
+        resp = requests.post(
+            url     = f"{API_BASE}/pipeline_job/{choice}",
+            timeout = TIMEOUT
+        )
+
+        if resp.status_code >= 400:
+            raise ApiError(
+                message = f"Start failed: HTTP {resp.status_code} - {resp.text[:200]}",
+                status_code = resp.status_code
+            )
+
+        data = resp.json()
+
+        return data.get("job_id")
+
+    except requests.RequestException as e:
+
+        raise ApiError(
+             message = f"Start failed: {e}"
+        )
+
+def cancel_job(job_id: str) -> None:
+
+    try:
+        resp = requests.post(
+            url     = f"{API_BASE}/cancel_job/{job_id}",
+            timeout = TIMEOUT
+        )
+
+        if resp.status_code >= 400:
+            raise ApiError(
+                message = f"Cancel failed: HTTP {resp.status_code} - {resp.text[:200]}",
+                status_code = resp.status_code
+            )
+
+    except requests.RequestException as e:
+
+        raise ApiError(
+            message = f"Cancel failed: {e}"
+        )
+
+st.title("Run Data Pipeline")
+st.caption("Run this before updating model data")
+
+st.markdown('<hr class="soft"/>', unsafe_allow_html=True)
 
 if not st.session_state.choice:
 
-    with st.container(vertical_alignment="center", horizontal_alignment="center"):
+    st.subheader("Choose Data Origin")
 
-        left, right = st.columns(2)
+    choice = st.segmented_control(
+        "Data Origin",
+        options=["Recruited", "Historical"],
+        selection_mode="single",
+        width="stretch",
+        key="choice_tmp"
+    )
 
-        with left:
-            recruited_button = st.button("Recruited", width="stretch")
+    st.write("")
 
-        with right:
-            historical_button = st.button("Historical", width="stretch")
+    start = st.button("Continue", type="primary", use_container_width=True)
 
-        if recruited_button:
-            st.session_state.choice = "rec"
+    if start:
+        if choice:
+            st.session_state.choice = "rec" if choice == "Recruited" else "hist"
             st.rerun()
-
-        elif historical_button:
-            st.session_state.choice = "hist"
-            st.rerun()
+        else:
+            st.warning("Please pick an option to continue")
 
 else:
-    with st.container(vertical_alignment="center", horizontal_alignment="center"):
 
-        # Each button triggers a re-run and will flag it as True
-        left, right = st.columns(2)
+    current = "Recruited" if st.session_state.choice == "rec" else "Historical"
+    st.markdown(f"<span class='badge run'>Dataset: {current}</span>", unsafe_allow_html=True)
 
-        with left:
-            run_button      = st.button("Run", width="stretch")
+    colA, colB, colC = st.columns(3)
 
-        with right:
-            restart_button  = st.button("Restart", width="stretch")
+    with colA:
+        run_btn = st.button("Run", type="primary", use_container_width=True)
+    with colB:
+        cancel_btn = st.button("Cancel", use_container_width=True)
+    with colC:
+        restart_btn = st.button("Restart", use_container_width=True)
 
-    if run_button:
+    if run_btn:
+        try:
+            with st.spinner("Starting pipeline"):
+                st.session_state.job_id_pipeline = start_job(st.session_state.choice)
+                st.session_state.progress = 0
+            st.toast(f"Pipeline started: `{st.session_state.job_id_pipeline}`")
+        except ApiError as e:
+            st.error(e.message)
 
-        response = requests.post(
-            f"http://127.0.0.1:{PORT}/v1/api/pipeline_job/{st.session_state.choice}"
-        )
-        response.raise_for_status()
-        st.session_state.job_id = response.json()["job_id"]
+    if cancel_btn and st.session_state.job_id_pipeline:
+        try:
+            with st.spinner("Cancelling job"):
+                cancel_job(st.session_state.job_id_pipeline)
+            st.info("Please restart")
+        except ApiError as e:
+            st.error(e.message)
 
-    if restart_button:
-
-        if st.session_state.job_id:
-
-            response = requests.post(
-                f"http://127.0.0.1:{PORT}/v1/api/cancel_job/{st.session_state.job_id}"
-            )
-            response.raise_for_status()
-            st.session_state.choice = None
-            st.session_state.job_id = None
-
-        else:
-            st.session_state.choice = None
-
+    if restart_btn:
+        with contextlib.suppress(Exception):
+            if st.session_state.job_id_pipeline:
+                cancel_job(st.session_state.job_id_pipeline)
+        st.session_state.choice = None
+        st.session_state.job_id_pipeline = None
+        st.session_state.progress = 0
         st.rerun()
 
-    if st.session_state.job_id:
+    if not cancel_btn and st.session_state.job_id_pipeline:
 
-        st.toast(f"Pipeline started: {st.session_state.job_id}")
+        progress_bar = st.progress(st.session_state.progress)
+        status_box = st.container()
 
-        ws = create_connection(
-            f"ws://127.0.0.1:{PORT}/v1/ws/status/{st.session_state.job_id}",
-            origin="http://localhost:8501",
-            timeout=10,
-        )
+        ws = None
 
-        ws.settimeout(1)
+        try:
+            ws = create_connection(
+                f"{WS_BASE}/status/{st.session_state.job_id_pipeline}",
+                origin="http://localhost:8501",
+                timeout=10,
+            )
+            ws.settimeout(1)
 
-        with st.status(label=f"`{st.session_state.job_id}`", expanded=True) as status:
-
-            bar = st.progress(0)
-
-            try:
-                while True:
-                    try:
-                        raw = ws.recv()
-                    except WebSocketTimeoutException:
-                        time.sleep(0.05)
-                        continue
-
-                    status_response = json.loads(raw)
-
-                    if status_response.get("type") == "status":
-
-                        progress    = int(status_response.get("progress", 0))
-                        log_message = status_response.get("message", "")
-                        state       = status_response.get("state", "")
-
-                        bar.progress(progress, text=f"{progress}%")
-
-                        with st.empty() as empty:
-                            st.write(f"{log_message}")
-
-                        if state == "completed":
-                            bar.progress(100)
-                            status.update(state="complete")
-                            st.balloons()
+            with status_box:
+                with st.status(label=f"`{st.session_state.job_id_pipeline}`", expanded=True) as status:
+                    while True:
+                        try:
+                            raw = ws.recv()
+                        except WebSocketTimeoutException:
+                            time.sleep(0.05)
+                            continue
+                        except WebSocketConnectionClosedException:
+                            st.warning("WebSocket closed by server.")
                             break
 
-                        if state in ("failed", "error"):
-                            status.update(label="Pipeline failed", state="error")
-                            st.error("Pipeline failed")
-                            break
-            finally:
-                ws.close()
+                        try:
+                            msg = json.loads(raw)
+                        except json.JSONDecodeError:
+                            continue
+
+                        if msg.get("type") == "status":
+                            progress = int(msg.get("progress", 0))
+                            message  = msg.get("message", "")
+                            state    = msg.get("state", "")
+
+                            st.session_state.progress = progress
+                            progress_bar.progress(progress, text=f"{progress}%")
+
+                            st.write(message)
+
+                            if state == "completed":
+                                progress_bar.progress(100)
+                                status.update(state="complete")
+                                st.balloons()
+                                break
+
+                            elif state in ("failed", "error"):
+                                status.update(label="Pipeline failed", state="error")
+                                st.error("Pipeline failed. Check server logs for details.")
+                                break
+
+        except Exception as e:
+            st.error(f"Live updates failed: {e}")
+
+        finally:
+            with contextlib.suppress(Exception):
+                if ws is not None:
+                    ws.close()
+
+st.markdown('<hr class="soft"/>', unsafe_allow_html=True)
