@@ -13,7 +13,7 @@ import requests
 from websocket import create_connection, WebSocketTimeoutException, WebSocketConnectionClosedException
 
 PORT = 8502
-API_BASE = f"http://127.0.0.1:{PORT}/v1/api"
+API_BASE = f"http://127.0.0.1:{PORT}/v1/jobs"
 WS_BASE  = f"ws://127.0.0.1:{PORT}/v1/ws"
 TIMEOUT  = (
     5,
