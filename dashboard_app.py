@@ -25,7 +25,7 @@ if st.session_state.logged_in:
             "ETL" : [
                 update_model_data_page,
                 run_pipeline_page,
-                data_monitoring_page
+                # data_monitoring_page
             ]
         },
         position="sidebar"
