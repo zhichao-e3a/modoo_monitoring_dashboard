@@ -2,6 +2,7 @@ from cache import get_data
 
 import pandas as pd
 import streamlit as st
+import plotly.graph_objects as go
 
 from datetime import date, datetime
 from collections import Counter
@@ -131,13 +132,19 @@ missing_edd = [
 ##################################################
 
 ########## Report by Gestational Age ##########
-ga_entry            = [f"{int(i['ga_entry']/7)} weeks" for i in patients if not pd.isna(i['ga_entry'])]
-ga_entry_dic        = dict(Counter(ga_entry))
-sorted_ga_entry_dic = dict(sorted(ga_entry_dic.items()))
+ga_df = pd.DataFrame(
+    {
+        "Mobile"                                : [i['mobile'] for i in patients],
+        "Gestational Age at Entry"              : [int(i['ga_entry']/7) for i in patients],
+        "Gestational Age at Last Measurement"   : [int(i['ga_exit_last']/7) if pd.notna(i['ga_exit_last']) else 0 for i in patients],
+        "Gestational Age at Delivery"           : [int(i['ga_exit_add']/7) if pd.notna(i['ga_exit_add']) else 0 for i in patients]
+    }
+)
 
-ga_exit             = [f"{int(i['ga_exit']/7)} weeks" for i in patients if not pd.isna(i['ga_exit'])]
-ga_exit_dic         = dict(Counter(ga_exit))
-sorted_ga_exit_dic  = dict(sorted(ga_exit_dic.items()))
+ga_df = ga_df.sort_values(["Gestational Age at Entry", "Gestational Age at Delivery"], ascending=[True, False])
+
+error_ga = [i for i in ga_df.to_dict('records') if (i['Gestational Age at Delivery'] > 45)]
+error_ga.sort(key=lambda x: x['Gestational Age at Delivery'], reverse=False)
 ##################################################
 
 with st.container():
@@ -243,19 +250,72 @@ with st.container():
 
     st.subheader(f"Report by Gestational Age ({date.today()})")
 
-    st.write(f"Gestational Age Weeks at Entry ({len(ga_entry)} patients)")
-    st.bar_chart(
-        sorted_ga_entry_dic,
-        x_label = "Gestational Age Weeks (Entry)",
-        y_label = "Patient Count"
+    n = len(ga_df)
+
+    window = st.number_input("Rows per page", min_value=8, max_value=n, value=8, step=1)
+
+    max_start = max(0, n - window)
+
+    if "start_idx" not in st.session_state:
+        st.session_state.start_idx = 0
+
+    prev_col, next_col = st.columns(2)
+    with prev_col:
+        if st.button("Previous", width='stretch'):
+            st.session_state.start_idx = max(0, st.session_state.start_idx-window)
+    with next_col:
+        if st.button("Next", width='stretch'):
+            st.session_state.start_idx = min(max_start, st.session_state.start_idx+window)
+
+    start = st.session_state.start_idx ; end = min(start + window, n)
+
+    subset = ga_df.iloc[start:end].copy()
+
+    len_add     = (subset["Gestational Age at Delivery"]-subset["Gestational Age at Entry"]).clip(lower=0).fillna(0)
+    len_last    = (subset["Gestational Age at Last Measurement"]-subset["Gestational Age at Entry"]).clip(lower=0).fillna(0)
+
+    fig = go.Figure()
+
+    fig.add_bar(
+        y=subset["Mobile"],
+        x=len_last,
+        base=subset["Gestational Age at Entry"],
+        orientation="h",
+        name="Last Measurement",
+        text=(subset["Gestational Age at Entry"].astype(str) + "→" + subset["Gestational Age at Last Measurement"].astype(str)),
+        textposition="outside"
     )
 
-    st.write(f"Gestational Age Weeks at Exit ({len(ga_exit)} patients)")
-    st.bar_chart(
-        sorted_ga_exit_dic,
-        x_label="Gestational Age Weeks (Exit)",
-        y_label="Patient Count"
+    fig.add_bar(
+        y=subset["Mobile"],
+        x=len_add,
+        base=subset["Gestational Age at Entry"],
+        orientation="h",
+        name="Actual Delivery",
+        text = (subset["Gestational Age at Entry"].astype(str) + "→" + subset["Gestational Age at Delivery"].astype(str)),
+        textposition = "outside"
     )
+
+    fig.update_layout(
+        barmode="group",
+        title=f"Total {n} patients: Patients {start+1} to {end}",
+        bargap=0.35,
+        height=600
+    )
+
+    fig.update_xaxes(
+        range=[25, 45],
+        title="Gestational Age (weeks)"
+    )
+
+    fig.update_yaxes(
+        type="category", title="Patient"
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+
+    st.write("Patients with Erroneous Gestational Age")
+    st.dataframe(error_ga)
 
 st.divider()
 
