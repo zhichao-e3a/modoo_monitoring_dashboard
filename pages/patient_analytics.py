@@ -32,11 +32,11 @@ def pct(old, new):
 curr_patients = [i for i in patients if i['date_joined'] <= end.strftime("%Y-%m-%d") ]
 past_patients = [i for i in patients if i['date_joined'] <= start.strftime("%Y-%m-%d")]
 
-rec         = [i for i in curr_patients if i['type'] == 'recruited']
-past_rec    = [i for i in past_patients if i['type'] == 'recruited']
+rec         = [i for i in curr_patients if i['type'] == 'rec']
+past_rec    = [i for i in past_patients if i['type'] == 'rec']
 
-hist        = [i for i in curr_patients if i['type'] == 'historical']
-past_hist   = [i for i in past_patients if i['type'] == 'historical']
+hist        = [i for i in curr_patients if i['type'] == 'hist']
+past_hist   = [i for i in past_patients if i['type'] == 'hist']
 ##################################################
 
 ########## Delivery Status ##########
@@ -58,26 +58,26 @@ past_ecsection  = [i for i in past_delivered if i['delivery_type'] == 'emergency
 curr_valid  = natural + ecsection
 past_valid  = past_natural + past_ecsection
 
-r_curr_valid = sum([1 for i in curr_valid if i['type'] == 'recruited'])
-h_curr_valid = sum([1 for i in curr_valid if i['type'] == 'historical'])
-r_past_valid = sum([1 for i in past_valid if i['type'] == 'recruited'])
-h_past_valid = sum([1 for i in past_valid if i['type'] == 'historical'])
+r_curr_valid = sum([1 for i in curr_valid if i['type'] == 'rec'])
+h_curr_valid = sum([1 for i in curr_valid if i['type'] == 'hist'])
+r_past_valid = sum([1 for i in past_valid if i['type'] == 'rec'])
+h_past_valid = sum([1 for i in past_valid if i['type'] == 'hist'])
 
 onset       = [i for i in curr_valid if not pd.isna(i['onset']) and i['onset']]
 past_onset  = [i for i in past_valid if not pd.isna(i['onset']) and i['onset']]
 
-r_curr_onset = sum([1 for i in onset if i['type'] == 'recruited'])
-h_curr_onset = sum([1 for i in onset if i['type'] == 'historical'])
-r_past_onset = sum([1 for i in past_onset if i['type'] == 'recruited'])
-h_past_onset = sum([1 for i in past_onset if i['type'] == 'historical'])
+r_curr_onset = sum([1 for i in onset if i['type'] == 'rec'])
+h_curr_onset = sum([1 for i in onset if i['type'] == 'hist'])
+r_past_onset = sum([1 for i in past_onset if i['type'] == 'rec'])
+h_past_onset = sum([1 for i in past_onset if i['type'] == 'hist'])
 
 add         = [i for i in curr_valid if not pd.isna(i['add']) and i['add']]
 past_add    = [i for i in past_valid if not pd.isna(i['add']) and i['add']]
 
-r_curr_add = sum([1 for i in add if i['type'] == 'recruited'])
-h_curr_add = sum([1 for i in add if i['type'] == 'historical'])
-r_past_add = sum([1 for i in past_add if i['type'] == 'recruited'])
-h_past_add = sum([1 for i in past_add if i['type'] == 'historical'])
+r_curr_add = sum([1 for i in add if i['type'] == 'rec'])
+h_curr_add = sum([1 for i in add if i['type'] == 'hist'])
+r_past_add = sum([1 for i in past_add if i['type'] == 'rec'])
+h_past_add = sum([1 for i in past_add if i['type'] == 'hist'])
 
 missing_targets = pd.DataFrame(columns=["Mobile", "Type", "Onset", "Actual Delivery"])
 for i in curr_valid:
