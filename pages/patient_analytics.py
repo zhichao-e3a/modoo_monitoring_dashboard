@@ -132,10 +132,18 @@ missing_edd = [
 ##################################################
 
 ########## Report by Gestational Age ##########
+ga_entry            = [int(i['ga_entry']/7) for i in patients]
+ga_entry_dic        = dict(Counter(ga_entry))
+sorted_ga_entry_dic = dict(sorted(ga_entry_dic.items()))
+
+ga_exit_add             = [int(i['ga_exit_add']/7) for i in patients if not pd.isna(i['ga_exit_add'])]
+ga_exit_add_dic         = dict(Counter(ga_exit_add))
+sorted_ga_exit_add_dic  = dict(sorted(ga_exit_add_dic.items()))
+
 ga_df = pd.DataFrame(
     {
         "Mobile"                                : [i['mobile'] for i in patients],
-        "Gestational Age at Entry"              : [int(i['ga_entry']/7) for i in patients],
+        "Gestational Age at Entry"              : ga_entry,
         "Gestational Age at Last Measurement"   : [int(i['ga_exit_last']/7) if pd.notna(i['ga_exit_last']) else 0 for i in patients],
         "Gestational Age at Delivery"           : [int(i['ga_exit_add']/7) if pd.notna(i['ga_exit_add']) else 0 for i in patients]
     }
@@ -181,7 +189,7 @@ with st.container():
 
 with st.container():
 
-    st.subheader("Endpoints Captured (for Natural, C-section)")
+    st.subheader("Endpoints Captured (for Natural, Emergency C-section)")
 
     c1, c2, c3 = st.columns(3)
     with c1:
@@ -250,6 +258,21 @@ with st.container():
 
     st.subheader(f"Report by Gestational Age ({date.today()})")
 
+    st.write(f"Gestational Age Weeks at Entry ({len(ga_entry)} patients)")
+    st.bar_chart(
+        sorted_ga_entry_dic,
+        x_label="Gestational Age Weeks (Entry)",
+        y_label="Patient Count"
+    )
+
+    st.write(f"Gestational Age Weeks at Exit ({len(ga_exit_add)} patients)")
+    st.bar_chart(
+        sorted_ga_exit_add_dic,
+        x_label="Gestational Age Weeks (Exit)",
+        y_label="Patient Count"
+    )
+
+    st.write("Gestational Age Weeks Analysis per Patient")
     n = len(ga_df)
 
     window = st.number_input("Rows per page", min_value=8, max_value=n, value=8, step=1)
