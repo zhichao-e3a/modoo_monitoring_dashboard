@@ -1,4 +1,4 @@
-from config.configs import MONGO_CONFIG, DEFAULT_MONGO_CONFIG
+from config.configs import MONGO_CONFIG, REMOTE_MONGO_CONFIG
 
 import json
 import hashlib
@@ -21,7 +21,7 @@ class MongoDBConnector:
     def _config(self) -> Dict[str, Any]:
 
         if self.mode == "remote":
-            return DEFAULT_MONGO_CONFIG
+            return REMOTE_MONGO_CONFIG
         elif self.mode == "local":
             return MONGO_CONFIG
 
@@ -58,7 +58,7 @@ class MongoDBConnector:
             query       : Optional[Dict[str, Any]] = {},
             projection  : Optional[Dict[str, int]] = None,
             sort        : Optional[List[Tuple[str, int]]] = None,
-            batch_size  : Optional[int] = 20_000
+            batch_size  : Optional[int] = 1000
 
     ) -> AsyncIterator[List[Dict[str, Any]]]:
 
@@ -69,18 +69,22 @@ class MongoDBConnector:
             async with self.resource(coll_name) as coll:
 
                 def make_cursor(base_q: Dict[str, Any], after_id=None):
-                    q = dict(base_q)  # shallow copy
+
+                    q = dict(base_q)
+
                     if after_id is not None:
+
                         if "_id" in q and isinstance(q["_id"], dict):
                             q["_id"] = {**q["_id"], "$gt": after_id}
                         else:
                             q["_id"] = {"$gt": after_id}
+
                     return coll.find(
-                        filter=q,
-                        projection=projection,
-                        sort=sort,
-                        batch_size=batch_size,
-                        no_cursor_timeout=True,
+                        filter = q,
+                        projection = projection,
+                        sort = sort,
+                        batch_size = batch_size,
+                        no_cursor_timeout = True,
                     )
 
                 cursor = make_cursor(query)
@@ -120,40 +124,43 @@ class MongoDBConnector:
     async def get_all_documents(
 
             self,
-            coll_name: str,
-            query: Optional[Dict[str, Any]] = None,
-            projection: Optional[Dict[str, int]] = None,
-            batch_size: Optional[int] = 1000
+            coll_name   : str,
+            query       : Optional[Dict[str, Any]] = {},
+            projection  : Optional[Dict[str, Any]] = None,
+            sort        : Optional[List[Tuple[str, int]]] = None,
+            batch_size  : Optional[int] = 1000
 
     ):
-
-        query       = query or {}
 
         async with self.resource(coll_name) as coll:
 
             try:
-
-                cursor = coll.find(query, projection=projection)
-
-                if batch_size:
-                    cursor = cursor.batch_size(batch_size)
+                cursor = coll.find(
+                    filter = query,
+                    projection = projection,
+                    sort = sort,
+                    batch_size = batch_size,
+                    no_cursor_timeout = True
+                )
 
                 return [doc async for doc in cursor]
 
             except AutoReconnect:
+
                 await asyncio.sleep(0.5)
-                cursor = coll.find({}, projection=projection)
+
+                cursor = coll.find(
+                    filter = query,
+                    projection = projection,
+                    sort = sort,
+                    batch_size = batch_size,
+                    no_cursor_timeout = True
+                )
+
                 if batch_size:
                     cursor = cursor.batch_size(batch_size)
+
                 return [doc async for doc in cursor]
-
-    async def count_documents(self, coll_name, count_filter=None):
-
-        async with self.resource(coll_name) as coll:
-
-            count = await coll.count_documents(count_filter or {})
-
-            return count
 
     @staticmethod
     async def flush(coll, ops):
@@ -180,9 +187,6 @@ class MongoDBConnector:
                 k:v for k,v in obj.items() if k in {
                     "edd",
                     "add",
-                    "uc",
-                    "fhr",
-                    "fmov",
                     "onset",
                     "annotations",
                     "notes"
@@ -204,7 +208,14 @@ class MongoDBConnector:
 
         return hashlib.sha1(blob).hexdigest()
 
-    async def upsert_documents_hashed(self, records, coll_name, batch_size=500):
+    async def upsert_documents_hashed(
+
+            self,
+            records: List[Dict[str, Any]],
+            coll_name: str,
+            batch_size: Optional[int] = 500
+
+    ) -> None:
 
         async with self.resource(coll_name) as coll:
 
@@ -274,7 +285,50 @@ class MongoDBConnector:
             if ops:
                 await self.flush(coll, ops)
 
-    async def delete_document(self, coll_name, query):
+    async def upsert_documents(
+
+            self,
+            records: List[Dict[str, Any]],
+            coll_name: str,
+            id_fields: List[str],
+            batch_size: Optional[int] = 1000
+
+    ) -> None:
+
+        async with self.resource(coll_name) as coll:
+
+            ops = []
+
+            for item in records:
+
+                _id = ''.join([item[f] for f in id_fields])
+
+                op = UpdateOne(
+                    {
+                        "_id": _id
+                    },
+                    {
+                        "$set": item
+                    },
+                    upsert=True
+                )
+
+                ops.append(op)
+
+                if len(ops) >= batch_size:
+                    await self.flush(coll, ops)
+                    ops = []
+
+            if ops:
+                await self.flush(coll, ops)
+
+    async def delete_document(
+
+            self,
+            coll_name: str,
+            query: str
+
+    ):
 
         async with self.resource(coll_name) as coll:
 
@@ -286,10 +340,3 @@ class MongoDBConnector:
                 await asyncio.sleep(0.5)
                 res = await coll.delete_one(query)
                 return res.deleted_count
-
-    async def delete_all_documents(self, coll_name, query={}):
-
-        async with self.resource(coll_name) as coll:
-
-            result = await coll.delete_many(query)
-            return result.deleted_count
