@@ -335,7 +335,7 @@ with st.container():
         type="category", title="Patient"
     )
 
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
 
     st.write("Patients with Erroneous Gestational Age")
     st.dataframe(error_ga)
