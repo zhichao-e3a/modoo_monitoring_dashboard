@@ -3,7 +3,20 @@ from cache import get_data
 import pandas as pd
 import streamlit as st
 
-data    = get_data(coll_name='dataset_all', limit=None)
+data    = get_data(
+    coll_name='dataset_all',
+    projection={
+        "_id": 0,
+        "uc_raw": 0,
+        "fhr_raw": 0,
+        "uc_windows": 0,
+        "fhr_windows": 0,
+        "ctime": 0,
+        "utime": 0,
+        "doc_hash": 0,
+    },
+    limit=None
+)
 df      = pd.DataFrame(data)
 
 for col in ["add", "onset", "measurement_date"]:
@@ -173,23 +186,3 @@ with st.container():
             st.write("Average Target by GA Week")
             chart_data = agg.set_index("GA Week")[["Avg Target"]]
             st.bar_chart(chart_data)
-
-st.divider()
-
-with st.container():
-
-    st.subheader("Missing Values Overview")
-
-    st.caption(
-        "Null overview is computed on a flattened DataFrame. "
-        "Nested objects are treated as a single field (not inspected element-wise)."
-    )
-
-    null_counts = df.isna().sum().reset_index()
-    null_counts.columns = ["Field", "Missing Count"]
-    null_counts["Missing %"] = (null_counts["Missing Count"] / len(df)) * 100
-
-    st.dataframe(
-        null_counts.sort_values("Missing Count", ascending=False),
-        width='stretch',
-    )
