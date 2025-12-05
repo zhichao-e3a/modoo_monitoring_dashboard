@@ -3,12 +3,42 @@ from cache import get_data
 import pandas as pd
 import streamlit as st
 
-data    = get_data(
-    coll_name='dataset_all',
+st.set_page_config(page_title="EDA Dashboard", layout="wide")
+
+st.title("Data Analytics Dashboard")
+st.divider()
+
+DATASET_OPTIONS = {
+    "Recruited + Contacted Historical   (Onset Target, no C-section)"       : "dataset_onset",
+    "Recruited + Contacted Historical   (ADD Target, no C-section)"         : "dataset_add",
+    "All Historical Only                (ADD Target, all delivery types)"   : "dataset_hist",
+    "Recruited + All Historical         (ADD Target, all delivery types)"   : "dataset_all"
+}
+
+with st.container():
+
+    st.subheader("Dataset Selection")
+
+    selected_label = st.selectbox(
+        "Choose dataset to view",
+        options=list(DATASET_OPTIONS.keys()),
+        index=0,
+    )
+
+    coll_name = DATASET_OPTIONS[selected_label]
+
+st.divider()
+
+data = get_data(
+    coll_name=coll_name,
     projection={
         "_id": 0,
         "uc_raw": 0,
         "fhr_raw": 0,
+        "fmov_raw": 0,
+        "uc_padded": 0,
+        "fhr_padded": 0,
+        "fmov_padded": 0,
         "uc_windows": 0,
         "fhr_windows": 0,
         "ctime": 0,
@@ -17,18 +47,14 @@ data    = get_data(
     },
     limit=None
 )
-df      = pd.DataFrame(data)
+
+df = pd.DataFrame(data)
 
 for col in ["add", "onset", "measurement_date"]:
     df[col] = pd.to_datetime(df[col], errors="coerce")
 
 df["ga_days"]   = df["static"].apply(lambda x: x[-1])
 df["ga_weeks"]  = (df["ga_days"]/7).round().astype("Float64")
-
-st.set_page_config(page_title="EDA Dashboard", layout="wide")
-
-st.title("Data Analytics Dashboard")
-st.divider()
 
 with st.container():
 
@@ -60,6 +86,7 @@ with st.container():
         df_filtered
         .groupby("mobile")
         .agg(
+            preterm=("preterm", "max"),
             measurements=("target", "count"),
             min_target=("target", "min"),
             max_target=("target", "max"),
@@ -68,22 +95,33 @@ with st.container():
         .reset_index()
     )
 
-    st.write(f"All patients ({len(patients)} patients)")
-    st.dataframe(patients, width='stretch')
+    c1, c2 = st.columns(2)
+    with c1:
+        st.metric("Total Patients", value=len(patients), border=True)
+        st.dataframe(patients, width='stretch')
+
+    with c2:
+        preterm = patients[patients["preterm"]==1].copy()
+        st.metric("Preterm Patients", value=len(preterm), border=True)
+        if preterm.empty:
+            st.info("No preterm patients")
+        else:
+            st.dataframe(preterm.reset_index(drop=True), width='stretch')
 
     c1, c2 = st.columns(2)
 
     with c1:
-        low_count = patients[patients["measurements"] < 20].copy()
-        st.write(f"Patients with less than 20 measurements ({len(low_count)} patients)")
+        low_count = patients[patients["measurements"] < 20].copy().drop(["preterm", "min_target", "max_target"], axis=1)
+        st.metric(f"Patients < 20 measurements", value=len(low_count), border=True)
         if low_count.empty:
             st.info("No patients with fewer than 20 measurements")
         else:
             st.dataframe(low_count.reset_index(drop=True), width='stretch')
 
     with c2:
-        long_min_target = patients[patients["min_target"] > 7].copy().sort_values("min_target", ascending=False)
-        st.write(f"Patients with min_target > 7 days ({len(long_min_target)} patients)")
+        long_min_target = patients[patients["min_target"] > 7].copy()\
+            .sort_values("min_target", ascending=False).drop(["preterm", "max_target"], axis=1)
+        st.metric(f"Patients min_target > 7 days", value=len(long_min_target), border=True)
         if long_min_target.empty:
             st.info("No patients with min_target > 7 days.")
         else:
